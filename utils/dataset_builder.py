@@ -5,7 +5,7 @@ import h5py
 import os
 
 #CONSTANTS
-OUTPUT_FILE = 'pikachu_charmander.hdf5'  # OUTPUT H5 FILE
+OUTPUT_FILE = 'pikachu_charmander_big.hdf5'  # OUTPUT H5 FILE
 ROOT_DIRECTORY = 'output'
 
 #TRAIN, TEST DATA
@@ -48,15 +48,22 @@ def build_labels_array(addrs, image_class_id):
 def divide_data(addrs, labels):
     train_addrs = addrs[0: int(TRAIN_SIZE * len(addrs))]
     train_labels = labels[0: int(TRAIN_SIZE * len(labels))]
-    test_addrs = addrs[int(TRAIN_SIZE * len(addrs)):]
-    test_labels = labels[int(TRAIN_SIZE * len(labels)):]
-    return (train_addrs, train_labels, test_addrs, test_labels)
+
+    test_addrs = addrs[int(TRAIN_SIZE * len(addrs)): int(TRAIN_SIZE * len(addrs)) + int(TEST_SIZE * len(addrs))]
+    test_labels = labels[int(TRAIN_SIZE * len(labels)): int(TRAIN_SIZE * len(labels)) + int(TEST_SIZE * len(labels))]
+
+    dev_addrs = addrs[int(TRAIN_SIZE * len(addrs)) + int(TEST_SIZE * len(addrs)): ]
+    dev_labels = labels[int(TRAIN_SIZE * len(labels)) + int(TEST_SIZE * len(labels)): ]
+
+    return (train_addrs, train_labels, test_addrs, test_labels, dev_addrs, dev_labels)
 
 #Init arrays
 train_addrs = []
 train_labels = []
 test_addrs = []
 test_labels = []
+dev_addrs = []
+dev_labels = []
 
 #Bild the classes and IDs
 classes = build_classes(ROOT_DIRECTORY)
@@ -70,16 +77,19 @@ for image_class in classes:
     #Shuffle the data
     (addrs, labels) = shuffle_data(addrs, labels)
     #Divide the data 
-    (train_addrs_class, train_labels_class, test_addrs_class, test_labels_class) = divide_data(addrs, labels)                               
+    (train_addrs_class, train_labels_class, test_addrs_class, test_labels_class, dev_addrs_class, dev_labels_class) = divide_data(addrs, labels)                               
     #Append the data to the existing arrays
     train_addrs.extend(train_addrs_class)
     train_labels.extend(train_labels_class)
     test_addrs.extend(test_addrs_class)
     test_labels.extend(test_labels_class)
+    dev_addrs.extend(dev_addrs_class)
+    dev_labels.extend(dev_labels_class)
 
 
 train_shape = (len(train_addrs), 128, 128, 3)
 test_shape = (len(test_addrs), 128, 128, 3)
+dev_shape = (len(dev_addrs), 128, 128, 3)
 
 # open a hdf5 file and create earrays 
 f = h5py.File(OUTPUT_FILE, mode='w')
@@ -88,6 +98,7 @@ f = h5py.File(OUTPUT_FILE, mode='w')
 # matplotlib: the pixels range is 0-1,dtype is float.
 f.create_dataset("train_img", train_shape, np.uint8)
 f.create_dataset("test_img", test_shape, np.uint8)  
+f.create_dataset("dev_img", dev_shape, np.uint8)
 
 # the ".create_dataset" object is like a dictionary, the "train_labels" is the key. 
 f.create_dataset("train_labels", (len(train_addrs),), np.uint8)
@@ -95,6 +106,9 @@ f["train_labels"][...] = train_labels
 
 f.create_dataset("test_labels", (len(test_addrs),), np.uint8)
 f["test_labels"][...] = test_labels
+
+f.create_dataset("dev_labels", (len(dev_addrs),), np.uint8)
+f["dev_labels"][...] = dev_labels
 
 f.create_dataset("list_classes", data=np.array(classes, 'S7'))
 ######################## third part: write the images #########################
@@ -123,5 +137,18 @@ for i in range(len(test_addrs)):
     img = cv2.resize(img, (128, 128), interpolation=cv2.INTER_CUBIC)
     img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
     f["test_img"][i, ...] = img[None]
+
+# loop over dev paths
+for i in range(len(dev_addrs)):
+
+    if i % 1000 == 0 and i > 1:
+        print ('Dev data: {}/{}'.format(i, len(dev_addrs)) )
+
+    addr = dev_addrs[i]
+    img = cv2.imread(addr)
+    img = cv2.resize(img, (128, 128), interpolation=cv2.INTER_CUBIC)
+    img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+    f["dev_img"][i, ...] = img[None]
+
 
 f.close()

@@ -7,7 +7,7 @@ def get_image_paths(path):
 
 
 #Set the directory of the dataset in here!
-DATASET_DIRECTORY = "archive/important_dataset"
+DATASET_DIRECTORY = "utils/dataset"
 OUTPUT_DATASET_FOLDER = "output"
 
 classes = os.listdir(DATASET_DIRECTORY)
